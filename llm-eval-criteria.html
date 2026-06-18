@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 자동평가 기준 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #f9f9f9;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #333;
+        }
+
+        .btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .btn-export {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-export:hover {
+            background: #764ba2;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .no-results-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .category-section {
+            margin-bottom: 40px;
+        }
+
+        .category-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        th {
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th:last-child {
+            border-right: none;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .keyword-word {
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .keyword-definition {
+            color: #666;
+            font-size: 12px;
+            max-width: 200px;
+        }
+
+        .score-cell {
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-word;
+            max-width: 180px;
+        }
+
+        .score-5 {
+            background: #f0f8f4;
+            color: #155724;
+            padding: 8px;
+            border-left: 3px solid #28a745;
+        }
+
+        .score-3 {
+            background: #fffbf0;
+            color: #856404;
+            padding: 8px;
+            border-left: 3px solid #ffc107;
+        }
+
+        .score-1 {
+            background: #fef5f5;
+            color: #721c24;
+            padding: 8px;
+            border-left: 3px solid #dc3545;
+        }
+
+        .empty-score {
+            color: #ccc;
+            font-style: italic;
+            font-size: 11px;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #e8eaf6;
+            color: #3f51b5;
+            border: 1px solid #c5cae9;
+            white-space: nowrap;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #f0f0f0;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .footer {
+            padding: 20px 30px;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                min-width: 100%;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .footer {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 LLM 자동평가 기준 도구</h1>
+            <p>검색어별 카테고리 정답 평가 기준 - 5점/3점/1점 기준 확인</p>
+        </div>
+
+        <div class="controls">
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="검색어 입력... (예: 이불, 소파, 수납)"
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="filter-group">
+                <span class="filter-label">카테고리</span>
+                <div class="filter-buttons" id="categoryButtons"></div>
+            </div>
+
+            <button class="btn-export" onclick="exportJSON()">JSON 내보내기</button>
+        </div>
+
+        <div class="content" id="content"></div>
+
+        <div class="footer">
+            <span id="resultCount">로딩 중...</span>
+            <span id="lastUpdated">마지막 업데이트: 2026-06-18</span>
+        </div>
+    </div>
+
+    <script>
+        let allData = {};
+        let filteredData = {};
+
+        const embeddedData = {"metadata": {"title": "검색어 - 카테고리 정답 평가 기준", "lastUpdated": "2026-06-18", "description": "LLM 자동평가를 위한 카테고리별 검색어 정답 기준"}, "categories": [{"id": "fabric", "name": "🛏️ 패브릭", "keywords": [{"word": "침구", "type": "대표상품", "definition": "잠잘 때 몸에 닿거나 덮어 수면 환경을 만드는 모든 섬유 제품", "scores": {"5": ["이불", "베개 / 베개커버", "패드 (패드, 토퍼, 매트리스커버)", "이불커버 / 침대커버", "쿨매트"], "3": [], "1": []}}, {"word": "침구세트", "type": "구성/세트", "definition": "수면에 필요한 침구 구성품을 한 번에 사용할 수 있도록 묶어 판매하는 패키지", "scores": {"5": ["이불+패드+베개", "이불커버+베드+베드스커트", "이불커버+베개"], "3": ["단품"], "1": []}}, {"word": "이불", "type": "대표상품", "definition": "수면 시 몸을 덮어 체온을 유지하고 쾌적함을 제공하는 침구", "scores": {"5": ["이불(베딩,차렵)", "이불커버(이불솜 구매 가능)", "세트", "담요(침대용 담요/이불겸용)"], "3": ["이불커버", "담요(일반 담요)"], "1": ["패드"]}}, {"word": "냉감이불", "type": "소재+이불", "definition": "", "scores": {"5": [], "3": [], "1": []}}, {"word": "이불세트", "type": "구성/세트", "definition": "이불 중심으로 구성 묶음 상품", "scores": {"5": ["이불+베개", "이불커버(이불솜 구 가능)+베개"], "3": ["이불커버(이불솜x)+베개", "단품"], "1": []}}, {"word": "사계절이불", "type": "계절/기능+이불", "definition": "계절 구분 없이 연중 사용하도록 설계된 범용 이불", "scores": {"5": ["이불", "이불커버(상품명 사계절 포함)", "이불커버(이불솜 구매 가능)"], "3": ["이불커버(상품명 사계절/차렵 키워드 x)", "시어서커", "여름", "냉감"], "1": ["상품명 겨울 포함", "극세사"]}}, {"word": "차렵이불", "type": "유형+이불", "definition": "겉감·충전재(솜)·안감을 함께 누벼, 커버 없이 바로 사용하는 일체형 이불", "scores": {"5": ["차렵이불", "이불커버+차렵이불 모두 판매", "이불커버(이불솜 구매 가능)", "홑겹이불(두툼·솜 있음 허용)"], "3": ["이불커버", "홑이불(얇은·솜 없음)", "홑겹이불(얇은·솜 없음)"], "1": []}}]}, {"id": "kitchen", "name": "🥣 주방", "keywords": [{"word": "그릇", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["유아동식기/세트"], "1": []}}, {"word": "냄비", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["곰솥/다용도솥", "압력솥"], "1": []}}, {"word": "냄비받침", "type": "악세사리", "definition": "", "scores": {"5": [], "3": ["기타주방소품"], "1": []}}]}, {"id": "deco", "name": "💡 홈데코/조명", "keywords": [{"word": "거실 조명", "type": "위치+상품", "definition": "", "scores": {"5": [], "3": [], "1": []}}, {"word": "달항아리", "type": "디자인/장식", "definition": "", "scores": {"5": ["일반액자"], "3": ["엽서", "중대형식물(높이60cm이상)", "조화식물/나무", "헌팅트로피/벽장식"], "1": []}}, {"word": "디퓨저", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["디자인캔들"], "1": ["자캔들/컵캔들", "캔들/캔들워머세트"]}}]}, {"id": "furniture", "name": "🪑 가구", "keywords": [{"word": "1인 소파베드", "type": "인원수+기능+상품", "definition": "", "scores": {"5": ["소파베드", "접이식 매트리스"], "3": ["침대류", "매트리스류", "소파"], "1": ["누울 수 없는 모든 카테고리"]}}, {"word": "1인소파", "type": "인원수+상품", "definition": "", "scores": {"5": [], "3": [], "1": ["벤치의자"]}}, {"word": "수납장", "type": "기능별상품", "definition": "", "scores": {"5": ["수납장(가구 수납장, 주방수납장 모두 포함)"], "3": ["수납장 유사 형태 / 카테고리 수납장 포함 그 외 상품 카테고리"], "1": ["무지주선반", "지주선반", "찬넬선반", "앵글/조립식선반", "잡지꽂이", "침대서랍"]}}, {"word": "침대프레임", "type": "부분상품", "definition": "", "scores": {"5": ["침대"], "3": ["매트리스", "깔판"], "1": []}}]}, {"id": "storage", "name": "📦 수납/정리", "keywords": [{"word": "수납 정리함", "type": "기능별상품", "definition": "", "scores": {"5": ["수납정리함(팬트리정리함, 서랍장(플라스틱) 등등)"], "3": ["대체 기능 카테고리(수납스툴, 트롤리 등 수납 정리 가능 카테고리)"], "1": []}}, {"word": "수납함", "type": "기능별상품", "definition": "", "scores": {"5": ["주 목적 수납으로 상자, 통 형태(팬트리정리함, 서랍장(플라스틱) 브레드함 등"], "3": ["일부 수납, 주 기능이 다른 경우 OR 형태가 상자, 통 아닌 경우(책장 / 바구니바스켓)"], "1": ["무관 (선반 - 현재 네거티브, 침대)"]}}, {"word": "리모컨정리함", "type": "용도별상품", "definition": "", "scores": {"5": [], "3": ["팬트리정리함", "데스크서랍함", "부착형서랍", "미니서랍함"], "1": []}}]}, {"id": "living", "name": "🧴 생활용품", "keywords": [{"word": "거실화", "type": "위치+상품", "definition": "", "scores": {"5": [], "3": ["청소슬리퍼"], "1": []}}, {"word": "분리수거", "type": "기능별상품", "definition": "", "scores": {"5": [], "3": ["패브릭바구니/바스켓"], "1": ["플라스틱리빙박스"]}}, {"word": "슬리퍼", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["청소슬리퍼/청소장갑"], "1": []}}]}, {"id": "appliance", "name": "📺 가전", "keywords": [{"word": "냉장고", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["업소용냉장고/쇼케이스", "와인셀러", "스탠드형김치냉장고", "김치냉장고", "냉동고"], "1": []}}, {"word": "드라이기", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["에어브러시", "가구가전패키지", "기타이미용가전", "가전패키지", "드라이룸/드라이기"], "1": ["헤어롤/롤셋"]}}, {"word": "빔프로젝터", "type": "대표상품", "definition": "", "scores": {"5": ["빔프로젝터"], "3": ["빔프로젝터 대체 상품", "파생상품"], "1": []}}]}, {"id": "pet", "name": "🐾 반려동물", "keywords": [{"word": "강아지집", "type": "대표상품", "definition": "", "scores": {"5": [], "3": ["케이지/철장"], "1": []}}, {"word": "고양이스크래쳐", "type": "동물+용도별상품", "definition": "", "scores": {"5": ["스크래쳐 (골판지, 기둥형, 소파형 등)"], "3": ["캣타워 (스크래쳐 포함된 경우)", "스크랩쳐 부속품"], "1": ["전혀 다른 용품 (급식기, 화장실 등)"]}}]}]};
+
+        function loadData() {
+            try {
+                allData = embeddedData;
+                initializeUI();
+                displayResults();
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+                document.getElementById('content').innerHTML =
+                    '<div class="no-results"><div class="no-results-icon">⚠️</div><p>데이터를 불러올 수 없습니다.</p></div>';
+            }
+        }
+
+        function initializeUI() {
+            const categoryContainer = document.getElementById('categoryButtons');
+            const allBtn = document.createElement('button');
+            allBtn.className = 'btn active';
+            allBtn.textContent = '전체';
+            allBtn.onclick = () => filterByCategory('all');
+            categoryContainer.appendChild(allBtn);
+
+            allData.categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.textContent = cat.name.split(' ')[1];
+                btn.dataset.id = cat.id;
+                btn.onclick = () => filterByCategory(cat.id);
+                categoryContainer.appendChild(btn);
+            });
+
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                search(e.target.value);
+            });
+        }
+
+        function filterByCategory(categoryId) {
+            document.querySelectorAll('.filter-buttons .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            if (categoryId === 'all') {
+                filteredData = allData;
+            } else {
+                const category = allData.categories.find(c => c.id === categoryId);
+                filteredData = {
+                    ...allData,
+                    categories: category ? [category] : []
+                };
+            }
+
+            const searchValue = document.getElementById('searchInput').value;
+            if (searchValue) {
+                search(searchValue);
+            } else {
+                displayResults();
+            }
+        }
+
+        function search(query) {
+            const lowerQuery = query.toLowerCase();
+            const results = {
+                ...allData,
+                categories: allData.categories.map(category => ({
+                    ...category,
+                    keywords: category.keywords.filter(kw =>
+                        kw.word.toLowerCase().includes(lowerQuery) ||
+                        (kw.definition && kw.definition.toLowerCase().includes(lowerQuery))
+                    )
+                })).filter(cat => cat.keywords.length > 0)
+            };
+
+            filteredData = results;
+            displayResults();
+        }
+
+        function displayResults() {
+            const content = document.getElementById('content');
+
+            if (filteredData.categories.length === 0) {
+                content.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">🔍</div>
+                        <p>검색 결과가 없습니다.</p>
+                    </div>
+                `;
+                document.getElementById('resultCount').textContent = '검색 결과: 0개';
+                return;
+            }
+
+            let html = '';
+            let totalKeywords = 0;
+
+            filteredData.categories.forEach(category => {
+                html += `<div class="category-section">
+                    <div class="category-title">${category.name}</div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 12%;">유형</th>
+                                    <th style="width: 10%;">검색어</th>
+                                    <th style="width: 13%;">정의</th>
+                                    <th style="width: 21%;">5점 (정답)</th>
+                                    <th style="width: 21%;">3점 (유사)</th>
+                                    <th style="width: 23%;">1점 (무관)</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                category.keywords.forEach(keyword => {
+                    totalKeywords++;
+                    const score5 = keyword.scores['5'].length > 0 ? keyword.scores['5'].join('<br>') : '<span class="empty-score">-</span>';
+                    const score3 = keyword.scores['3'].length > 0 ? keyword.scores['3'].join('<br>') : '<span class="empty-score">-</span>';
+                    const score1 = keyword.scores['1'].length > 0 ? keyword.scores['1'].join('<br>') : '<span class="empty-score">-</span>';
+                    const typeHtml = keyword.type ? `<span class="type-badge">${keyword.type}</span>` : '<span class="empty-score">-</span>';
+
+                    html += `<tr>
+                        <td>${typeHtml}</td>
+                        <td><span class="keyword-word">${keyword.word}</span></td>
+                        <td><span class="keyword-definition">${keyword.definition || '-'}</span></td>
+                        <td><div class="score-cell score-5">${score5}</div></td>
+                        <td><div class="score-cell score-3">${score3}</div></td>
+                        <td><div class="score-cell score-1">${score1}</div></td>
+                    </tr>`;
+                });
+
+                html += `</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            });
+
+            content.innerHTML = html;
+            document.getElementById('resultCount').textContent = `검색 결과: ${totalKeywords}개`;
+        }
+
+        function exportJSON() {
+            const dataStr = JSON.stringify(filteredData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `llm-eval-criteria-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>
